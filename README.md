@@ -38,7 +38,7 @@ from dl_backtrace.tf_backtrace import Backtrace as B
 from dl_backtrace.pytorch_backtrace import Backtrace as B
 ```
 
-### Evalauting using Backtrace:
+### Evaluating using Backtrace:
 
 1. Step - 1: Initialize a Backtrace Object using your Model
 ```python
