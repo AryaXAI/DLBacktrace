@@ -427,6 +427,13 @@ class Backtrace(object):
                     b1 = l1.state_dict()['bias']
                     pad1 = l1.padding[0]
                     strides1 = l1.stride[0]
+                    dilation1 = l1.dilation
+                    groups1 = l1.groups
+                    if not isinstance(b1, np.ndarray):
+                        b1 = b1.numpy()
+                    if not isinstance(w1, np.ndarray):
+                        w1 = w1.numpy()  # Convert PyTorch tensor to NumPy array
+
                     temp_wt = UP.calculate_wt_conv_1d(
                         all_wt[start_layer],
                         all_out[child_nodes[0]][0],
@@ -434,6 +441,8 @@ class Backtrace(object):
                         b1,
                         pad1, 
                         strides1,
+                        dilation1,
+                        groups1,
                         activation_dict[model_resource[1][start_layer]["name"]],
                     )
                     all_wt[child_nodes[0]] += temp_wt.T
@@ -713,10 +722,17 @@ class Backtrace(object):
                     b1 = l1.state_dict()['bias']
                     pad1 = l1.padding[0]
                     strides1 = l1.stride[0]
+                    dilation1 = l1.dilation
+                    groups1 = l1.groups
+                    if not isinstance(b1, np.ndarray):
+                        b1 = b1.numpy()
+                    if not isinstance(w1, np.ndarray):
+                        w1 = w1.numpy()  # Convert PyTorch tensor to NumPy array
+
                     temp_wt_pos,temp_wt_neg = UC.calculate_wt_conv_1d(all_wt_pos[start_layer],
                                                                 all_wt_neg[start_layer],
                                                                 all_out[child_nodes[0]][0],
-                                                                w1,b1, pad1, strides1,
+                                                                w1,b1, pad1, strides1,dilation1,groups1,
                                                                 activation_dict[model_resource[1][start_layer]['name']])
                     all_wt_pos[child_nodes[0]] += temp_wt_pos.T
                     all_wt_neg[child_nodes[0]] += temp_wt_neg.T

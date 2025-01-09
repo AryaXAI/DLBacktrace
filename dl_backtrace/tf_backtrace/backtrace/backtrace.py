@@ -301,14 +301,23 @@ class Backtrace(object):
                     b1 = l1.weights[1]
                     pad1 = l1.padding
                     strides1 = l1.strides[0]
+                    dilation1 = l1.dilation_rate[0]
+                    groups1 = l1.groups
+                    if not isinstance(b1, np.ndarray):
+                        b1 = b1.numpy()
+                    if not isinstance(w1, np.ndarray):
+                        w1 = w1.numpy()  # Convert PyTorch tensor to NumPy array
+
                     temp_wt = UP.calculate_wt_conv_1d(
-                        all_wt[start_layer],
-                        all_out[child_nodes[0]][0],
-                        w1,
-                        b1,
-                        pad1, 
-                        strides1,
-                        activation_dict[model_resource["graph"][start_layer]["name"]],
+                        wts=all_wt[start_layer],
+                        inp=all_out[child_nodes[0]][0],
+                        w=w1,
+                        b=b1,
+                        padding=pad1, 
+                        stride=strides1,
+                        dilation=dilation1,
+                        groups=groups1,
+                        act=activation_dict[model_resource["graph"][start_layer]["name"]],
                     )
                     all_wt[child_nodes[0]] += temp_wt
                 elif model_resource["graph"][start_layer]["class"] == "Conv1DTranspose":
@@ -591,11 +600,24 @@ class Backtrace(object):
                     b1 = l1.weights[1]
                     pad1 = l1.padding
                     strides1 = l1.strides[0]
-                    temp_wt_pos,temp_wt_neg = UC.calculate_wt_conv_1d(all_wt_pos[start_layer],
-                                                                all_wt_neg[start_layer],
-                                                                all_out[child_nodes[0]][0],
-                                                                w1,b1, pad1, strides1,
-                                                                activation_dict[model_resource["graph"][start_layer]['name']])
+                    dilation1 = l1.dilation_rate[0]
+                    groups1 = l1.groups
+                    if not isinstance(b1, np.ndarray):
+                        b1 = b1.numpy()
+                    if not isinstance(w1, np.ndarray):
+                        w1 = w1.numpy()  # Convert PyTorch tensor to NumPy array
+
+                    temp_wt_pos,temp_wt_neg = UC.calculate_wt_conv_1d(
+                                                                wts_pos=all_wt_pos[start_layer],
+                                                                wts_neg=all_wt_neg[start_layer],
+                                                                inp=all_out[child_nodes[0]][0],
+                                                                w=w1,
+                                                                b=b1,
+                                                                padding=pad1,
+                                                                stride=strides1,
+                                                                dilation=dilation1,
+                                                                groups=groups1,
+                                                                act=activation_dict[model_resource["graph"][start_layer]['name']])
                     all_wt_pos[child_nodes[0]] += temp_wt_pos
                     all_wt_neg[child_nodes[0]] += temp_wt_neg
                 elif model_resource["graph"][start_layer]["class"] == "Conv1DTranspose":
