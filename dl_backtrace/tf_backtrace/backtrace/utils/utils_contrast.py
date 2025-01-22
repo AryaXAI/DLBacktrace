@@ -840,20 +840,100 @@ def calculate_wt_conv_unit_1d(patch, wts_pos, wts_neg, w, b, act):
     
     return wt_mat_pos, wt_mat_neg
 
-def calculate_wt_conv_1d(wts_pos, wts_neg, inp, w, b, padding, stride, act):
-    input_padded, paddings = calculate_padding_1d(w.shape[0], inp, padding, stride)
-    out_ds_pos = np.zeros_like(input_padded)
-    out_ds_neg = np.zeros_like(input_padded)
-    for ind in range(wts_pos.shape[0]):
-        indexes = np.arange(ind * stride, ind * stride + w.shape[0])
-        tmp_patch = input_padded[indexes]
-        updates_pos,updates_neg = calculate_wt_conv_unit_1d(tmp_patch, wts_pos[ind, :], wts_neg[ind, :], w, b, act)
+def calculate_padding_1d_v2(kernel_size, input_length, padding, strides, dilation=1, const_val=0.0):
+    """
+    Calculate and apply padding to match TensorFlow Keras behavior for 'same', 'valid', and custom padding.
+    
+    Parameters:
+        kernel_size (int): Size of the convolutional kernel.
+        input_length (int): Length of the input along the spatial dimension.
+        padding (str/int/tuple): Padding type. Can be:
+            - 'valid': No padding.
+            - 'same': Pads to maintain output length equal to input length (stride=1).
+            - int: Symmetric padding on both sides.
+            - tuple/list: Explicit padding [left, right].
+        strides (int): Stride size of the convolution.
+        dilation (int): Dilation rate for the kernel.
+        const_val (float): Value used for padding. Defaults to 0.0.
+    
+    Returns:
+        padded_length (int): Length of the input after padding.
+        paddings (list): Padding applied on left and right sides.
+    """
+    effective_kernel_size = (kernel_size - 1) * dilation + 1  # Effective size considering dilation
 
-        out_ds_pos[indexes] += updates_pos
-        out_ds_neg[indexes] += updates_neg
+    if padding == 'valid':
+        return input_length, [0, 0]
+    elif padding == 'same':
+        # Total padding required to keep output size same as input
+        pad_total = max(0, (input_length - 1) * strides + effective_kernel_size - input_length)
+        pad_left = pad_total // 2
+        pad_right = pad_total - pad_left
+    elif isinstance(padding, int):
+        pad_left = padding
+        pad_right = padding
+    elif isinstance(padding, (list, tuple)) and len(padding) == 2:
+        pad_left, pad_right = padding
+    else:
+        raise ValueError("Invalid padding. Use 'valid', 'same', an integer, or a tuple/list of two integers.")
 
-    out_ds_pos = out_ds_pos[paddings[0]:(paddings[0] + inp.shape[0])]
-    out_ds_neg = out_ds_neg[paddings[0]:(paddings[0] + inp.shape[0])]
+    padded_length = input_length + pad_left + pad_right
+    return padded_length, [pad_left, pad_right]
+
+
+def calculate_wt_conv_unit_1d_v2(patch, wts_pos, wts_neg, w, b, act):
+    """
+    Calculate the weights for a single patch of the input with positive and negative contributions.
+    """
+    k = w
+    bias = b
+    conv_out = np.einsum("ijk,ij->ijk", k, patch)
+    p_ind = conv_out>0
+    p_ind = conv_out*p_ind
+    p_sum = np.einsum("ijk->k",p_ind)
+    n_ind = conv_out<0
+    n_ind = conv_out*n_ind
+    n_sum = np.einsum("ijk->k",n_ind)*-1.0
+    p_agg_wt_pos, p_agg_wt_neg, n_agg_wt_pos, n_agg_wt_neg, p_sum, n_sum = calculate_base_wt_array(p_sum, n_sum, bias, wts_pos, wts_neg)
+    wt_mat_pos = np.zeros_like(k)
+    wt_mat_neg = np.zeros_like(k)
+    wt_mat_pos = wt_mat_pos+((p_ind/p_sum)*p_agg_wt_pos)
+    wt_mat_pos = wt_mat_pos+((n_ind/n_sum)*n_agg_wt_pos)*-1.0
+    wt_mat_neg = wt_mat_neg+((p_ind/p_sum)*p_agg_wt_neg)
+    wt_mat_neg = wt_mat_neg+((n_ind/n_sum)*n_agg_wt_neg)*-1.0
+    wt_mat_pos = np.sum(wt_mat_pos,axis=-1)
+    wt_mat_neg = np.sum(wt_mat_neg,axis=-1)  
+    return wt_mat_pos, wt_mat_neg
+
+def calculate_wt_conv_1d(wts_pos, wts_neg, inp, w, b, padding, stride, dilation, groups, act):
+    """
+    Perform relevance propagation for 1D convolution with dilation and groups.
+    """
+    kernel_size = w.shape[0]
+    input_length = inp.shape[0]
+    padded_length, paddings = calculate_padding_1d_v2(kernel_size, input_length, padding, stride, dilation)
+    inp_padded = np.pad(inp, ((paddings[0], paddings[1]), (0, 0)), 'constant', constant_values=0)
+    out_ds_pos = np.zeros_like(inp_padded)
+    out_ds_neg = np.zeros_like(inp_padded)
+    
+    input_channels_per_group = inp.shape[1] // groups
+    output_channels_per_group = wts_pos.shape[1] // groups
+    
+    for g in range(groups):
+        input_start = g * input_channels_per_group
+        input_end = (g + 1) * input_channels_per_group
+        output_start = g * output_channels_per_group
+        output_end = (g + 1) * output_channels_per_group
+
+        for ind in range(wts_pos.shape[0]):
+            start_idx = ind * stride
+            tmp_patch = inp_padded[start_idx:start_idx + kernel_size * dilation:dilation, input_start:input_end]
+            updates_pos, updates_neg = calculate_wt_conv_unit_1d_v2(tmp_patch, wts_pos[ind, output_start:output_end], wts_neg[ind, output_start:output_end], w[:, :, output_start:output_end], b[output_start:output_end], act)
+            out_ds_pos[start_idx:start_idx + kernel_size * dilation:dilation, input_start:input_end] += updates_pos
+            out_ds_neg[start_idx:start_idx + kernel_size * dilation:dilation, input_start:input_end] += updates_neg
+
+    out_ds_pos = out_ds_pos[paddings[0]:(paddings[0] + inp.shape[0]), :]
+    out_ds_neg = out_ds_neg[paddings[0]:(paddings[0] + inp.shape[0]), :]
     return out_ds_pos, out_ds_neg
 
 def calculate_wt_max_unit_1d(patch, wts, pool_size):
