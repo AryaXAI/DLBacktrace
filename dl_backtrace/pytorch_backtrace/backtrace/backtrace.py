@@ -474,24 +474,25 @@ class Backtrace(object):
                         all_wt[start_layer], all_out[child_nodes[0]][0]
                     )
                     all_wt[child_nodes[0]] += temp_wt
-                elif (
-                        model_resource[1][start_layer]["class"] == "AdaptiveAvgPool2d"
-                ):
+                elif model_resource[1][start_layer]["class"] == "AdaptiveAvgPool2d":
                     temp_wt = UP.calculate_wt_gavgpool(
                         all_wt[start_layer], all_out[child_nodes[0]][0]
                     )
                     all_wt[child_nodes[0]] += temp_wt.T
                 elif model_resource[1][start_layer]["class"] == "MaxPool2d":
                     l1 = model_resource[0][start_layer]
+                    pad1 = l1.padding
+                    strides1 = l1.stride
+
                     temp_wt = UP.calculate_wt_maxpool(
-                        all_wt[start_layer], all_out[child_nodes[0]][0], (l1.kernel_size, l1.kernel_size)
+                        all_wt[start_layer], all_out[child_nodes[0]][0], (l1.kernel_size, l1.kernel_size), pad1, strides1
                     )
                     all_wt[child_nodes[0]] += temp_wt.T
                 elif model_resource[1][start_layer]["class"] == "AvgPool2d":
                     l1 = model_resource[0][start_layer]
-                    temp_wt = UP.calculate_wt_avgpool(
-                        all_wt[start_layer], all_out[child_nodes[0]][0], (l1.kernel_size, l1.kernel_size)
-                    )
+                    pad1 = l1.padding
+                    strides1 = l1.stride
+                    temp_wt = UP.calculate_wt_avgpool(all_wt[start_layer], all_out[child_nodes[0]][0], (l1.kernel_size, l1.kernel_size),pad1,strides1)
                     all_wt[child_nodes[0]] += temp_wt.T
                 elif model_resource[1][start_layer]["class"] == "MaxPool1d":
                     l1 = model_resource[0][start_layer]

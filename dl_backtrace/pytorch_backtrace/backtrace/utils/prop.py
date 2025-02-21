@@ -715,12 +715,12 @@ def calculate_wt_avgpool(wts, inp, pool_size, padding, strides):
                     paddings[1][0]:(paddings[1][0]+inp.shape[1]),:]
     return out_ds
 def calculate_wt_gavgpool(wts, inp):
-    wts=wts.T
-    inp=inp.T
     channels = wts.shape[0]
+    inp = inp.T
+    wts = wts.T
     wt_mat = np.zeros_like(inp)
     for c in range(channels):
-        wt = wts[c]
+        wt = wts[..., c]
         temp_wt = wt_mat[..., c]
         x = inp[..., c]
         p_mat = np.copy(x)
