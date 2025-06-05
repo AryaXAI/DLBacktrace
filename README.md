@@ -29,6 +29,14 @@ pip install dl-backtrace
 
 ## Usage 
 
+Due to Recent Update of Colab we will need to Downgrade Tensorflow.
+```bash
+!pip uninstall -y tensorflow tensorflow-text tf-keras jax tensorstore ml-dtypes protobuf
+!pip install "tensorflow==2.14.0" "numpy<2.0" "ml-dtypes==0.2.0" protobuf==4.25.3 --quiet --no-cache-dir
+!pip install dl-backtrace graphviz lime shap --quiet
+!pip install numpy==1.24.3 pandas==1.5.3 matplotlib==3.7.1 seaborn==0.12.2 scikit-learn==1.3.2 scipy==1.10.1
+```
+
 ### Tensoflow-Keras based models
 
 ```python
